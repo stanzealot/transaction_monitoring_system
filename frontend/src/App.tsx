@@ -1,19 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TransactionTable from './components/TransactionTable';
-import type { Transaction } from './types';
+import type { Transaction, Dispute } from './types';
+import { getTransactions, errorMessage } from './api';
 import Filters from './components/Filters';
-import { mockTransactions, mockDisputes } from './mockData';
 import Pagination from './components/Pagination';
 import TransactionDetails from './components/TransactionDetails';
 
 const PAGE_SIZE = 5;
 export default function App() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
 
-  const [disputes, setDisputes] = useState(mockDisputes);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [selected, setSelected] = useState<Transaction | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    getTransactions({
+      page,
+      limit: PAGE_SIZE,
+      search: debouncedSearch || undefined,
+      status: status || undefined,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setTransactions(res.data);
+        setTotal(res.total);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(errorMessage(err));
+          setLoading(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [page, debouncedSearch, status]);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -25,20 +67,28 @@ export default function App() {
     setPage(1); // Reset to first page on status change
   };
 
-  const term = search.toLowerCase().trim();
-  const filtered = mockTransactions.filter((tx) => {
-    const matchesSearch =
-      term === '' ||
-      tx.reference.toLowerCase().includes(term) ||
-      tx.customer_name.toLowerCase().includes(term);
-    const matchesStatus = status === '' || tx.status === status;
-    return matchesSearch && matchesStatus;
-  });
+  // const term = search.toLowerCase().trim();
+  // const filtered = mockTransactions.filter((tx) => {
+  //   const matchesSearch =
+  //     term === '' ||
+  //     tx.reference.toLowerCase().includes(term) ||
+  //     tx.customer_name.toLowerCase().includes(term);
+  //   const matchesStatus = status === '' || tx.status === status;
+  //   return matchesSearch && matchesStatus;
+  // });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const start = (page - 1) * PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const handleDisputeRaised = (dispute: Dispute) => {
+    const addDispute = (t: Transaction): Transaction => ({
+      ...t,
+      disputes: [...(t.disputes ?? []), dispute],
+    });
 
-  const pageItems = filtered.slice(start, start + PAGE_SIZE);
+    setSelected((prev) => (prev ? addDispute(prev) : prev));
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === dispute.transaction_id ? addDispute(t) : t)),
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -51,19 +101,31 @@ export default function App() {
         onSearchChange={handleSearchChange}
         onStatusChange={handleStatusChange}
       />
-      <TransactionTable transactions={pageItems} onRowClick={setSelected} />
+
+      {error && <p className="text-red-500">{error}</p>}
+      {loading ? (
+        <p className="text-gray-500">Loading transactions...</p>
+      ) : (
+        <TransactionTable
+          transactions={transactions}
+          onRowClick={setSelected}
+        />
+      )}
+
       <Pagination
         page={page}
         totalPages={totalPages}
-        totalItems={filtered.length}
+        totalItems={total}
         pageSize={PAGE_SIZE}
         onPageChange={setPage}
       />
+
       {selected && (
         <TransactionDetails
           transaction={selected}
-          dispute={disputes.filter((d) => d.transaction_id === selected.id)}
+          dispute={selected.disputes ?? []}
           onClose={() => setSelected(null)}
+          onDisputeRaised={handleDisputeRaised}
         />
       )}
     </div>

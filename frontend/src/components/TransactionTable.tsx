@@ -47,7 +47,14 @@ export default function TransactionTable({ transactions, onRowClick }: Props) {
               className="border-b border-gray-100 hover:bg-gray-50"
             >
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {tx.reference}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono "> {tx.reference}</span>
+                  {tx.disputes?.some((d) => d.status === 'open') && (
+                    <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
+                      Disputed
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 {tx.customer_name}

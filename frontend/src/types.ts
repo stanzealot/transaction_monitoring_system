@@ -2,17 +2,18 @@ export type TxStatus = 'success' | 'pending' | 'failed';
 export type DisputeStatus = 'open' | 'resolved';
 
 export interface Transaction {
-  id: string;
+  id: number;
   reference: string;
   customer_name: string;
   amount: number; // ISO date string
   status: TxStatus;
   timestamp: string;
+  disputes?: Dispute[]; // Optional array of disputes associated with the transaction
 }
 
 export interface Dispute {
-  id: string;
-  transaction_id: string;
+  id: number;
+  transaction_id: number;
   reason: string;
   status: DisputeStatus;
   created_at: string; // ISO date string

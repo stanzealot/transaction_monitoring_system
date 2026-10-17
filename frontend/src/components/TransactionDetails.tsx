@@ -1,24 +1,31 @@
+import { useState } from 'react';
 import type { Transaction, Dispute } from '../types';
 import { formatAmount, formatDate } from '../utils';
+import RaiseDisputeForm from './RaiseDisputeForm';
 
 interface Props {
   transaction: Transaction;
   dispute: Dispute[];
   onClose: () => void;
+  onDisputeRaised: (dispute: Dispute) => void;
 }
 
 export default function TransactionDetails({
   transaction,
   dispute,
   onClose,
+  onDisputeRaised,
 }: Props) {
+  const [showForm, setShowForm] = useState(false);
+  const hasOpenDispute = dispute.some((d) => d.status === 'open');
+
   return (
     <div
       className="fixed inset-0  flex items-center justify-center bg-black bg-opacity-50 p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -64,6 +71,27 @@ export default function TransactionDetails({
               </li>
             ))}
           </ul>
+        )}
+        {showForm ? (
+          <RaiseDisputeForm
+            transactionId={transaction.id}
+            onSuccess={(newDispute) => {
+              onDisputeRaised(newDispute);
+              setShowForm(false);
+            }}
+            onClose={() => setShowForm(false)}
+          />
+        ) : hasOpenDispute ? (
+          <p className="mt-4 text-sm text-gray-500">
+            This transaction already has an open dispute.
+          </p>
+        ) : (
+          <button
+            onClick={() => setShowForm(true)}
+            className="mt-4 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Raise Dispute
+          </button>
         )}
       </div>
     </div>
